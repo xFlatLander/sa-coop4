@@ -12,6 +12,7 @@
 #include "common/lib/log/Log.h"
 #include "common/lib/util/Util.h"
 #include "shared/config/Config.h"
+#include "shared/game/Anim.h"
 #include "shared/game/Game.h"
 #include "shared/game/Script.h"
 #include "shared/lib/core/Core.h"
@@ -45,6 +46,13 @@ using PadFn = void(__fastcall*)(void*, void*);
 PadFn g_origUpdateMouse = nullptr;
 void __fastcall HookUpdateMouse(void* self, void* edx) {
     if (ui::In().MouseCaptured()) {
+        if (ui::In().CursorFromGameMouse()) {  // exclusive fullscreen: our cursor moves by the game's reading of the mouse
+            g_origUpdateMouse(self, edx);
+            auto* s = (uint8_t*)0xB73418;  // CPad::NewMouseControllerState, the game's menu settings' inversion undone
+            float sx = game::Ref<uint8_t>(0xBA6744) ? -1.0f : 1.0f, sy = game::Ref<uint8_t>(0xBA6745) ? -1.0f : 1.0f;
+            ui::In().FeedGameMouse(game::Field<float>(s, 0x0C) * sx, game::Field<float>(s, 0x10) * sy, s[0] != 0,
+                                   s[3] ? 1 : s[4] ? -1 : 0);
+        }
         memset((void*)0xB73418, 0, 0x14);  // CPad::NewMouseControllerState
         memset((void*)0xB7342C, 0, 0x14);  // CPad::OldMouseControllerState
         return;
@@ -74,6 +82,15 @@ int __cdecl HookIdleEvent(int event, void* param) {
 
 using VoidFn = void(__cdecl*)();
 VoidFn g_origStartUserPause = nullptr;
+
+// Two copies of the game on one PC (multi_instance): a pad plugin reading XInput (GInput) feeds every copy, focused or
+// not, and the player of the other window jumped and walked along. Only the focused window's player takes the pads.
+VoidFn g_origUpdatePads = nullptr;
+void __cdecl HookUpdatePads() {
+    g_origUpdatePads();
+    if (GetForegroundWindow() == (HWND)game::GameWindow()) return;
+    for (int i = 0; i < 2; ++i) game::GetPad(i)->NewState = game::CControllerState{};
+}
 void __cdecl HookStartUserPause() {
     // In a co-op session the world is shared: the pause menu must not freeze it.
     if (Cfg().noPauseMenu && core::IsInCoopSession()) return;
@@ -90,22 +107,44 @@ void __fastcall HookMenuStopRadio(void* audio, void* edx, void* settings, bool d
     g_origMenuStopRadio(audio, edx, settings, duringPause);
 }
 
+// With no_pause_menu the game runs on under the menu, and the radio retunes only as by the car's wheel
+// (CheckForStationRetune): a station picked on the menu's audio page, the radio off too, never came. Under the open menu
+// it is applied as on a pause.
+using RetuneFn = void(__fastcall*)(void*, void*);
+RetuneFn g_origRetune = nullptr;
+void __fastcall HookCheckForStationRetune(void* radio, void* edx) {
+    if (Cfg().noPauseMenu && core::IsInCoopSession() && game::Ref<uint8_t>(0xBA67A4))  // FrontEndMenuManager.m_bMenuActive
+        return game::CallMethod<0x4EB890>(radio);  // CAERadioTrackManager::CheckForStationRetuneDuringPause
+    g_origRetune(radio, edx);
+}
+
 // ---------------------------------------------------------------- video mode / windowed / intro
 struct RwVideoMode {
     int width, height, depth, flags, refRate, format;
 };
 constexpr int rwVIDEOMODEEXCLUSIVE = 1;
 
+// A frameless window may take the whole screen (the taskbar too), a framed one keeps to the work area
+RECT WindowArea() {
+    RECT area{0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)};
+    if (!Cfg().borderless) SystemParametersInfoW(SPI_GETWORKAREA, 0, &area, 0);
+    return area;
+}
+
+LONG WindowStyle() {
+    return Cfg().borderless ? WS_POPUP | WS_VISIBLE : WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE;
+}
+
 void AdjustWindow(HWND hwnd, int w, int h) {
     auto& cfg = Cfg();
-    LONG style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE;
+    LONG style = WindowStyle();
     SetWindowLongW(hwnd, GWL_STYLE, style);
     SetWindowLongW(hwnd, GWL_EXSTYLE, 0);
+    if (!cfg.windowTitle.empty()) SetWindowTextW(hwnd, Utf8ToWide(cfg.windowTitle).c_str());
     RECT rc{0, 0, (LONG)w, (LONG)h};
     AdjustWindowRectEx(&rc, style, FALSE, 0);
     int ww = rc.right - rc.left, wh = rc.bottom - rc.top;
-    RECT work;
-    SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+    RECT work = WindowArea();
     int x = cfg.windowX, y = cfg.windowY;
     if (x < 0 || y < 0) {
         x = work.left + ((work.right - work.left) - ww) / 2;
@@ -118,10 +157,9 @@ void AdjustWindow(HWND hwnd, int w, int h) {
 
 // Picks the largest size with the requested aspect that fits into the work area together with the frame.
 void FitToWorkArea(int& w, int& h) {
-    RECT work;
-    SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+    RECT work = WindowArea();
     RECT frame{0, 0, 100, 100};
-    AdjustWindowRectEx(&frame, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE, 0);
+    AdjustWindowRectEx(&frame, WindowStyle() & ~WS_VISIBLE, FALSE, 0);
     int maxW = (work.right - work.left) - ((frame.right - frame.left) - 100);
     int maxH = (work.bottom - work.top) - ((frame.bottom - frame.top) - 100);
     if (w <= maxW && h <= maxH) return;
@@ -223,6 +261,69 @@ IDirect3D9* WINAPI HookDirect3DCreate9(UINT sdk) {
             (GetAdapterDisplayModeFn)mem::SwapVTable(vt, 8, (void*)&HookGetAdapterDisplayMode);
     }
     return d3d;
+}
+
+// _psGrabScreen (a camera's photo, the screenshot key) in a window copies the whole screen (GetFrontBufferData, a surface
+// the size of the display) and reads the window's part of it from GetWindowRect: frame and title included. A window as
+// big as the screen ran past the copy (1936 of 1920 wide), the unchecked LockRect failed, and the game crashed on the
+// photo. The part read is the client area, inside its monitor.
+BOOL WINAPI GrabWindowRect(HWND hwnd, RECT* r) {
+    POINT tl{0, 0};
+    RECT c{};
+    MONITORINFO mi{};
+    mi.cbSize = sizeof mi;
+    if (!GetClientRect(hwnd, &c) || !ClientToScreen(hwnd, &tl) ||
+        !GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mi))
+        return GetWindowRect(hwnd, r);
+    LONG w = mi.rcMonitor.right - mi.rcMonitor.left, h = mi.rcMonitor.bottom - mi.rcMonitor.top;
+    LONG x = tl.x - mi.rcMonitor.left, y = tl.y - mi.rcMonitor.top;
+    *r = {std::clamp(x, 0L, w), std::clamp(y, 0L, h), std::clamp(x + c.right, 0L, w), std::clamp(y + c.bottom, 0L, h)};
+    if (r->right - r->left < 1 || r->bottom - r->top < 1) *r = {0, 0, w, h};  // off its monitor: all of it
+    return TRUE;
+}
+
+// CClothes::ConstructPedModel asks for the walk set of the body it builds (fat, muscular) and lets the other one go
+// (RequestMotionGroupAnims, by this game's stats). For the other player's copy those stats hold its muscle (MuscleFrom):
+// a fat CJ's set was let go for a muscular copy, the streaming dropped it while our player stood, and the next step read
+// an empty walk set (crashes in CTaskSimplePlayerOnFoot::PlayerControlZelda, 0x68861B). Ours is asked for again at once.
+VoidFn g_origMotionAnims = nullptr;
+void __cdecl HookRequestMotionGroupAnims() {
+    g_origMotionAnims();
+    game::CPlayerPed* me = game::FindPlayerPed(0);
+    int group = me ? game::Field<int32_t>(me, 0x4D4) : 0;  // CPed::m_nAnimGroup
+    const char* block = group == 55 ? "fat" : group == 56 ? "muscular" : nullptr;  // ANIM_GROUP_FAT, ANIM_GROUP_MUSCULAR
+    if (int i = block ? game::Call<0x4D3990, int>(block) : -1; i >= 0)  // CAnimManager::GetAnimationBlockIndex
+        game::RequestModel(game::anim::kIfpBase + i, 2 | 0x10);                 // GAME_REQUIRED, PRIORITY_REQUEST
+}
+
+// CClothes::ConstructPedModel builds the player's clump on its model's texture dictionary. With that one gone (a mod's
+// streaming in a player's build) CClothesBuilder::CreateSkinnedClump went through a null one: the game crashed on the
+// balaclava of "Home Invasion" (RwTexDictionaryForAllTextures, 0x7F3737). The model stays as it was then.
+using ConstructPedModelFn = void(__cdecl*)(uint32_t, void*, const void*, bool);
+ConstructPedModelFn g_origConstructPedModel = nullptr;
+void __cdecl HookConstructPedModel(uint32_t model, void* clothes, const void* old, bool cutscene) {
+    void* mi = model < 20000 ? game::Ref<void*>(game::addr::ModelInfoPtrs + model * 4) : nullptr;
+    auto* txds = game::Ref<game::CPoolHeader*>(0xC8800C);  // CTxdStore::ms_pTxdPool
+    int slot = mi ? game::Field<int16_t>(mi, 0x0A) : -1;   // m_nTxdIndex
+    void* dict = txds && slot >= 0 && slot < txds->size && txds->byteMap[slot] >= 0
+                     ? game::Ref<void*>((uintptr_t)txds->objects + (uintptr_t)slot * 0xC)  // TxdDef::m_pRwDictionary
+                     : nullptr;
+    if (!dict) {
+        static bool told = false;
+        if (!told) LOGW("Player model %u has no texture dictionary (slot %d): not rebuilt", model, slot);
+        told = true;
+        return;
+    }
+    g_origConstructPedModel(model, clothes, old, cutscene);
+}
+
+void InstallGrabScreenFix() {
+    static const uint8_t was[] = {0xFF, 0x15, 0xF0, 0x82, 0x85, 0x00};  // call [__imp_GetWindowRect]
+    if (!mem::Check(0x74530B, was, sizeof was)) return LOGW("Screen grab fix skipped: unexpected bytes at 0x74530B");
+    uint8_t call[6] = {0xE8, 0, 0, 0, 0, 0x90};
+    int32_t rel = (int32_t)((uintptr_t)&GrabWindowRect - (0x74530B + 5));
+    memcpy(call + 1, &rel, 4);
+    mem::Write(0x74530B, call, sizeof call);
 }
 
 void InstallWindowedMode() {
@@ -383,20 +484,33 @@ OpenFileMappingWFn g_origOpenFileMappingW = nullptr;
 std::string UniqueA(LPCSTR name) { return std::string(name) + "#sacoop" + std::to_string(GetCurrentProcessId()); }
 std::wstring UniqueW(LPCWSTR name) { return std::wstring(name) + L"#sacoop" + std::to_wstring(GetCurrentProcessId()); }
 
+// Only the objects of the game and of its plugins (from its folder) get the suffix. A program hooked into the game from
+// outside opens its object by name from its own process: OBS's game capture never found its CaptureHook_* mapping.
+bool FromGameFolder(void* caller) {
+    HMODULE mod = nullptr;
+    wchar_t path[MAX_PATH];
+    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCWSTR)caller,
+                            &mod) ||
+        !GetModuleFileNameW(mod, path, MAX_PATH))
+        return true;
+    static const std::wstring dir = ModuleDir();
+    return _wcsnicmp(path, dir.c_str(), dir.size()) == 0;
+}
+
 HANDLE WINAPI HookCreateFileMappingA(HANDLE f, LPSECURITY_ATTRIBUTES sa, DWORD prot, DWORD hi, DWORD lo, LPCSTR name) {
-    if (!name) return g_origCreateFileMappingA(f, sa, prot, hi, lo, name);
+    if (!name || !FromGameFolder(__builtin_return_address(0))) return g_origCreateFileMappingA(f, sa, prot, hi, lo, name);
     return g_origCreateFileMappingA(f, sa, prot, hi, lo, UniqueA(name).c_str());
 }
 HANDLE WINAPI HookCreateFileMappingW(HANDLE f, LPSECURITY_ATTRIBUTES sa, DWORD prot, DWORD hi, DWORD lo, LPCWSTR name) {
-    if (!name) return g_origCreateFileMappingW(f, sa, prot, hi, lo, name);
+    if (!name || !FromGameFolder(__builtin_return_address(0))) return g_origCreateFileMappingW(f, sa, prot, hi, lo, name);
     return g_origCreateFileMappingW(f, sa, prot, hi, lo, UniqueW(name).c_str());
 }
 HANDLE WINAPI HookOpenFileMappingA(DWORD access, BOOL inherit, LPCSTR name) {
-    if (!name) return g_origOpenFileMappingA(access, inherit, name);
+    if (!name || !FromGameFolder(__builtin_return_address(0))) return g_origOpenFileMappingA(access, inherit, name);
     return g_origOpenFileMappingA(access, inherit, UniqueA(name).c_str());
 }
 HANDLE WINAPI HookOpenFileMappingW(DWORD access, BOOL inherit, LPCWSTR name) {
-    if (!name) return g_origOpenFileMappingW(access, inherit, name);
+    if (!name || !FromGameFolder(__builtin_return_address(0))) return g_origOpenFileMappingW(access, inherit, name);
     return g_origOpenFileMappingW(access, inherit, UniqueW(name).c_str());
 }
 
@@ -410,15 +524,15 @@ CreateMutexAFn g_origCreateMutexA = nullptr;
 // gta_sa.exe creates the streaming semaphore with the global name "CdStream": two game copies would
 // share one kernel object and steal each other's read requests (the second copy hangs while loading).
 HANDLE WINAPI HookCreateSemaphoreA(LPSECURITY_ATTRIBUTES sa, LONG init, LONG max, LPCSTR name) {
-    if (!name) return g_origCreateSemaphoreA(sa, init, max, name);
+    if (!name || !FromGameFolder(__builtin_return_address(0))) return g_origCreateSemaphoreA(sa, init, max, name);
     return g_origCreateSemaphoreA(sa, init, max, UniqueA(name).c_str());
 }
 HANDLE WINAPI HookCreateEventA(LPSECURITY_ATTRIBUTES sa, BOOL manual, BOOL initial, LPCSTR name) {
-    if (!name) return g_origCreateEventA(sa, manual, initial, name);
+    if (!name || !FromGameFolder(__builtin_return_address(0))) return g_origCreateEventA(sa, manual, initial, name);
     return g_origCreateEventA(sa, manual, initial, UniqueA(name).c_str());
 }
 HANDLE WINAPI HookCreateMutexA(LPSECURITY_ATTRIBUTES sa, BOOL owner, LPCSTR name) {
-    if (!name) return g_origCreateMutexA(sa, owner, name);
+    if (!name || !FromGameFolder(__builtin_return_address(0))) return g_origCreateMutexA(sa, owner, name);
     return g_origCreateMutexA(sa, owner, UniqueA(name).c_str());
 }
 
@@ -572,7 +686,7 @@ void ApplyWindowPlacement() {
             TerminateProcess(GetCurrentProcess(), 3);
         }
     }
-    if (rc.right == g_winW && rc.bottom == g_winH && (style & WS_CAPTION) == WS_CAPTION) return;
+    if (rc.right == g_winW && rc.bottom == g_winH && (style & WS_CAPTION) == (WindowStyle() & WS_CAPTION)) return;
     static int attempts = 0;
     if (++attempts > 5) return;  // something keeps resizing the window: stop fighting it
     LOGI("Window placement: client %ldx%ld style %08lX -> %dx%d", rc.right, rc.bottom, style, g_winW, g_winH);
@@ -586,12 +700,35 @@ void Apply() {
     // registered in CWorld::Players[1] only while it is processed. CGameLogic::IsCoopGameGoingOn -> false
     static const uint8_t retFalse[] = {0x33, 0xC0, 0xC3};  // xor eax,eax; ret
     mem::Write(0x441390, retFalse, sizeof(retFalse));
+    // The split screen's leash, CGameLogic::IsPlayerAllowedToGoInThisDirection, held that registered copy 20 m from our
+    // player: walking, swimming or driving away it stood still and slid after its owner, and a jump away (25 m) never
+    // started, so a climb up a wall showed as a glide. Always allowed.
+    static const uint8_t retTrue[] = {0xB0, 0x01, 0xC3};  // mov al,1; ret
+    mem::Write(0x441E10, retTrue, sizeof(retTrue));
+    // CGameLogic::IsPlayerUse2PlayerControls looks at both CWorld::Players itself, so the copy, processed in its slot,
+    // aimed by the split screen's rules: crouched, the stick was turned by the camera onto the copy's own axes, a roll
+    // to the side came out as a crouched step whenever the copy faced a few degrees off its owner's camera, and its aim
+    // heading was set from the stick every frame, still or not (the copy shook while crouched and aiming). Never.
+    mem::Write(0x442020, retFalse, sizeof(retFalse));
 
     if (cfg.multiInstance) {
         mem::Write(0x7468E0, retFalse, sizeof(retFalse));  // IsAlreadyRunning -> false
         IsolateInstance();
     }
 
+    if (cfg.multiInstance) mem::RedirectCallFn(0x53BEE6, &HookUpdatePads, &g_origUpdatePads);  // CGame::Process -> CPad::UpdatePads
+
+    // CdStreamInit opens the IMG archives past Windows' file cache (FILE_FLAG_NO_BUFFERING when the disk's sector is 2 KB
+    // or less). A player's clothes are built from pieces read one by one and let go at once (CClothesBuilder: up to 10
+    // models and 18 textures of player.img), and the other player's copy is built again at each look it sends and at
+    // each spawn: every time from the disk, a second or two on a hard disk. Through the cache they come from memory.
+    static const uint8_t kNoBuffering[] = {0xB8, 0x00, 0x00, 0x00, 0x20};  // mov eax, FILE_FLAG_NO_BUFFERING
+    if (mem::Check(0x406BC8, kNoBuffering, sizeof kNoBuffering)) {
+        static const uint8_t kBuffered[] = {0xB8, 0x00, 0x00, 0x00, 0x00};
+        mem::Write(0x406BC8, kBuffered, sizeof kBuffered);
+    } else {
+        LOGW("Stream cache patch skipped: unexpected bytes at 0x406BC8 (another mod has it)");
+    }
     if (cfg.runInBackground) {
         // WinMain: "if (!ForegroundApp) { Sleep(100); continue; }" -> never sleep
         if (*(uint8_t*)0x748A8D == 0x0F && *(uint8_t*)0x748A8E == 0x84) mem::Nop(0x748A8D, 6);
@@ -606,6 +743,7 @@ void Apply() {
     mem::HookFn(0x561AF0, &HookStartUserPause, &g_origStartUserPause, "CTimer::StartUserPause");
     mem::RedirectCallFn(0x576C55, &HookMenuStopRadio, &g_origMenuStopRadio);  // CMenuManager::CheckForMenuClosing
     mem::RedirectCallFn(0x5737A5, &HookMenuStopRadio, &g_origMenuStopRadio);  // CMenuManager::SwitchToNewScreen
+    mem::RedirectCallFn(0x4EB9F4, &HookCheckForStationRetune, &g_origRetune);   // CAERadioTrackManager::Service
     mem::HookFn(0x746190, &HookSelectDevice, &g_origSelectDevice, "psSelectDevice");
     mem::HookFn(0x710310, &HookStencilForObject, &g_origStencilForObject, "CStencilShadows::RenderForObject");
     mem::HookFn(0x431F80, &HookCreateCarForScript, &g_origCreateCarForScript, "CCarCtrl::CreateCarForScript");
@@ -616,6 +754,9 @@ void Apply() {
     } else {
         LOGW("Stream cursor guard skipped: unexpected bytes at 0x4F145C (another mod?)");
     }
+    InstallGrabScreenFix();
+    mem::RedirectCallFn(0x5A8235, &HookRequestMotionGroupAnims, &g_origMotionAnims);  // CClothes::ConstructPedModel
+    mem::HookFn(0x5A81E0, &HookConstructPedModel, &g_origConstructPedModel, "CClothes::ConstructPedModel");
     if (cfg.windowed) {
         InstallWindowedMode();
         mem::HookFn(0x745C70, &HookSetVideoMode, &g_origSetVideoMode, "SetVideoMode");

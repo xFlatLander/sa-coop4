@@ -16,6 +16,7 @@ uint8_t g_stunTx[12];
 nat::Endpoint g_mapped;
 std::atomic<bool> g_stunWaiting{false};
 ENetAddress g_lanServer{};  // answer to the LAN discovery
+std::atomic<bool> g_signalFailed{false};  // the invite code's channel (ntfy.sh) did not take our address
 
 int ENET_CALLBACK Intercept(ENetHost* h, ENetEvent*) {
     const uint8_t* d = h->receivedData;
@@ -54,6 +55,7 @@ ENetAddress FindRelay(const std::string& code) {
 void PrepareNat(ENetHost* client, ENetAddress& server, ENetAddress& relay, const std::string& code) {
     client->intercept = &Intercept;
     g_mapped = {};
+    g_signalFailed = false;
     for (const std::string& s : nat::StunServers()) {
         size_t colon = s.rfind(':');
         ENetAddress stun{};
@@ -71,6 +73,7 @@ void PrepareNat(ENetHost* client, ENetAddress& server, ENetAddress& relay, const
     g_stunWaiting = false;
     if (g_mapped.Valid()) {
         bool ok = nat::SignalPublish(nat::kDefaultSignalUrl, nat::SignalTopic(code), "PUNCH " + g_mapped.ToString());
+        g_signalFailed = !ok;
         LOGI("Наш внешний адрес: %s. Хост %s", g_mapped.ToString().c_str(), ok ? "оповещён" : "не оповещён (нет связи с ntfy)");
         if (ok) relay = FindRelay(code);  // the host allows our address on its relay when it gets the message
         if (relay.host) LOGI("У хоста есть ретранслятор: %s", nat::Endpoint{relay.host, relay.port}.ToString().c_str());
@@ -147,6 +150,8 @@ void NetClient::Poll(std::vector<Packet>& out) {
     }
 }
 
+bool NetClient::SignalFailed() const { return g_signalFailed; }
+
 void NetClient::ThreadMain(std::string host, uint16_t port) {
     ENetHost* client = enet_host_create(nullptr, 1, proto::CH_COUNT, 0, 0);
     if (!client) {
@@ -176,6 +181,11 @@ void NetClient::ThreadMain(std::string host, uint16_t port) {
     // direct (or punched) first; the relay when that does not answer within 4 s
     bool useRelay = relay.host && Cfg().forceRelay;
     uint64_t relayAt = relay.host && !useRelay ? GetTickCount64() + 4000 : 0;
+    auto viaRelay = [client] {  // what the connect handshake tells the server (net::kRelayMtu)
+        client->mtu = net::kRelayMtu;
+        enet_host_bandwidth_limit(client, net::kRelayBandwidth, 0);
+    };
+    if (useRelay) viaRelay();
     ENetPeer* peer = enet_host_connect(client, useRelay ? &relay : &addr, proto::CH_COUNT, 0);
     if (!peer) {
         enet_host_destroy(client);
@@ -208,6 +218,7 @@ void NetClient::ThreadMain(std::string host, uint16_t port) {
         if (!connected && relayAt && (GetTickCount64() >= relayAt || peer->state == ENET_PEER_STATE_DISCONNECTED)) {
             LOGI("Напрямую сервер не отвечает. Подключаемся через ретранслятор");
             enet_peer_reset(peer);
+            viaRelay();
             peer = enet_host_connect(client, &relay, proto::CH_COUNT, 0);
             relayAt = 0;
             if (!peer) break;
@@ -222,7 +233,7 @@ void NetClient::ThreadMain(std::string host, uint16_t port) {
                     connected = true;
                     m_state = State::Connected;
                     m_connectEvent = true;
-                    LOGI("Соединение с сервером установлено");
+                    LOGI("Соединение с сервером установлено (MTU %u)", peer->mtu);
                     break;
                 case ENET_EVENT_TYPE_DISCONNECT:
                     if (!connected && relayAt) {

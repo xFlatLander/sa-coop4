@@ -2,35 +2,37 @@
 
 ## Что нового
 
-- **Предметы в руках.** Поднос из закусочной, банку из автомата, сигарету и раскрытый парашют второй игрок видит у себя. Сигареты курящих прохожих тоже видны обоим.
-- **Телефон.** Когда игрок говорит по телефону, второй видит телефон у его уха.
-- **Речь прохожих.** Прохожие переговариваются, ругаются и кричат у обоих одинаково.
-- **Полицейские заграждения.** Барьеры и горящие машины заграждения, которое полиция ставит игроку с розыском, видны и второму игроку.
-- **Сюжетные персонажи как модель игрока.** Если игрок выбрал модель сюжетного персонажа, например Свита или Райдера, второй тоже видит его в ней.
-- **Время после смерти.** Пока в игре есть напарник, смерть или арест хоста больше не переводят часы на 12 часов вперёд. Сохранение переводит часы на 6 часов, как раньше.
-- **Быстрое переподключение.** Игрок, у которого вылетела игра, может сразу зайти снова под тем же ником. Раньше сервер не пускал его ещё 10–20 секунд.
+- **Сцены на движке игры.** Сцены миссий на движке игры (с чёрными полосами) напарник смотрит той же камерой, что и хост, и слышит их реплики. Если миссия переносит хоста в другое место прямо перед сценой, напарник оказывается там вместе с ним. Подсказки во время таких сцен, например советы парикмахера после стрижки, напарник тоже видит.
+- **Лоурайдеры и танец на пляже вдвоём.** В конкурсе лоурайдеров («Cesar Vialpando») и в танце на пляже («Life's a Beach») напарник играет рядом с хостом под ту же музыку, и его очки идут в общий счёт. В машине напарника тоже сидит девушка, а камеры конкурса показывают его машину.
+- **«Home Invasion» вдвоём.** Ящики в ограблении дома с Райдером может носить и грузить в фургон любой из двоих. Напарник надевает ту же балаклаву и крадётся, у него своя полоска шума, а задние двери фургона открыты у обоих.
+- **Миссию может начать напарник.** Если напарник пришёл в маркер миссии первым, хост видит приглашение и по Y сразу оказывается рядом с ним. Миссия начинается, как только в маркере стоят оба.
+- **Без чёрного экрана после миссии.** Сюжетный прогресс хоста напарник теперь загружает в маркере следующей миссии, где экран и так темнеет перед её началом. Раньше загрузка случалась в случайный момент после каждой пройденной миссии и выглядела как лаг или чёрный экран. Если миссий нет 10 минут, мир загрузится в спокойный момент, как раньше.
+- **Общие навыки и статистика.** Навыки вождения машины, мотоцикла, велосипеда и самолёта общие: у обоих лучший из двух. Статистика в меню паузы тоже общая. Подработка или испытание, пройденные одним игроком, засчитываются обоим вместе с наградой.
+- **Своя война за территорию.** Напарник дальше 100 м от хоста может начать свою войну за район. Хост увидит в чате, за какой район она идёт и чем кончилась.
+- **Транспорт для напарника.** Если в миссии хост сел на велосипед, мотоцикл или в машину без свободного места, рядом с напарником появляется такой же транспорт. Если миссия посадила хоста в самолёт прямо в воздухе, как в конце «Freefall», напарник садится к нему пассажиром.
+- **Пассажир с геймпада.** Чтобы сесть пассажиром с геймпада, удерживайте треугольник полсекунды. На клавиатуре так же работает удержание клавиши входа.
 
 ## Исправления
 
-- Хост больше не вылетает в «Sweet's Girl», когда едет пассажиром у напарника.
-- Экран напарника больше не остаётся чёрным, когда хост пропускает сцену (например, на вокзале в «Wrong Side of the Tracks») или выходит посреди миссии.
-- Миссии больше не пропадают у обоих после загрузки сохранения, в котором застрял флаг «идёт миссия». Такое сохранение остаётся после быстрого сохранения из сборки или сохранения в момент смерти. Мод сам опускает этот флаг через минуту после загрузки.
-- После «The Green Sabre» напарник больше не получает 4 звезды розыска, которые нельзя сбросить.
-- Напарник больше не оказывается заперт в притоне в «Cleaning the Hood».
-- Исправлены вылеты: когда в игре слишком много людей, машин или объектов, у игроков с разными модами машин, оружия и тюнинга, когда миссия удаляет машину вместе со вторым игроком, а также вылет при высоком качестве теней, который ещё случался в 0.2.6. Падение игры уже после выхода из неё (так бывает со связкой MixSets и GPS-мода) больше не считается вылетом.
-- Чат, окно F9 и код для друга видны и тогда, когда другой плагин перехватывает отрисовку интерфейса игры.
-- Пассажир, который стрелял из окна, после стрельбы садится обратно. Раньше он оставался высунутым из окна.
-- Если у двери больницы или участка стоит второй игрок, воскресший появляется в полутора метрах от него, а не внутри.
-- Напарник в самолёте, вертолёте, лодке или на парашюте больше не высаживается, когда у хоста начинается катсцена. Напарник, который подключился посреди катсцены, видит её, а голосование за пропуск не ждёт напарника, у которого катсцена так и не пошла.
-- Подработки, гонки, школы, тир, спортзалы и другие побочные занятия хоста больше не считаются для напарника миссией. Напарник не получает их тексты и награды и может в это время заниматься своими.
-- Оружие, которое выдаёт миссия хоста, больше не затирает оружие напарника того же типа.
-- Сюжетные покупки хоста (Wang Cars, магазин Зеро, Verdant Meadows) сразу появляются и у напарника.
-- Подкова или устрица, которую нашёл один игрок, больше не даёт второму $100.
-- Когда игрок выходит, его машины и люди вокруг остаются у второго, а не пропадают. Люди, которых игра приняла от другого игрока, снова реагируют на выстрелы и драки.
-- Машина второго игрока больше не взрывается от одного сильного удара. Копия напарника больше не удаляет такси вместе с водителем, когда напарник едет в нём.
-- Если оба игрока оказались за рулём одной машины, она остаётся у хоста, а второй пересаживается на соседнее место. Раньше каждый видел другого застывшим рядом.
-- Напарник больше не получает мир прошлого сеанса, если хост загрузил другое сохранение. Игра, которая подолгу стояла на загрузке или зависла, больше не применяет потом разом устаревшие данные. Копии предметов больше не попадают в сохранения хоста.
-- Лог прошлого запуска остаётся рядом, в `coop\coop.old.log`. Он пригодится, если после вылета игру уже запустили снова.
+- Убраны подвисания на 1–2 секунды. Их давал голосовой чат, даже когда никто не говорил, а ещё копия второго игрока, которая при каждом переодевании читала одежду с диска.
+- Тело, которое убрала игра его владельца, больше не появляется снова и не роняет деньги раз за разом. Эта ошибка появилась в 0.3.0.
+- После «The Green Sabre» напарник больше не получает 4 неснимаемые звезды в других городах, а заграждения между городами пропадают у него, как только он загрузит мир хоста в маркере следующей миссии.
+- Напарник видит красные маркеры назначения из миссий хоста. Раньше он не видел их вовсе.
+- Кассиры, продавцы Ammu-Nation, парикмахеры и татуировщики больше не появляются дважды.
+- Пассажир, который высунулся из окна с оружием не из списка (не узи, Tec-9 или MP5), больше не стреляет «из пальцев».
+- Клавиша T внутри чит-кода больше не открывает чат.
+- Машины второго игрока больше не пропадают, когда миссия хоста расчищает место вокруг себя.
+- Курсор в окне SA:COOP с кодом приглашения в полноэкранной игре больше не замирает.
+- Если игра стоит в Program Files, сервер больше не теряет профили напарников: тогда его данные лежат в `%LOCALAPPDATA%\SA-COOP`.
+- Если код приглашения не может связаться с ntfy.sh (в некоторых сетях этот сайт недоступен), игра так и пишет и советует VPN или открытый порт, а не винит брандмауэр.
+- Напарник получает звёзды розыска по правилам миссии, как и хост. Раньше в некоторых миссиях он получал звёзды там, где хост их не получает.
+- Копия второго игрока вздрагивает от ударов, как он сам.
+- Машина второго игрока больше не выглядит тормозящей, со стоп-сигналами и дымом из-под задних колёс.
+- Снимок фотоаппаратом больше не роняет игру в оконном режиме.
+- В доме из «Home Invasion» у напарника больше нет посторонних людей.
+- Граффити и собранные предметы у перезашедшего напарника такие же, как у хоста.
+- Название района в сообщениях о войне банд больше не превращается в набор знаков.
+- Если игра надолго подвисла, в `coop.log` теперь видно, на чём.
 
 ## Установка
 
@@ -38,7 +40,7 @@
 
 Чтобы обновиться с прошлой версии, распакуйте архив поверх старых файлов. Настройки и прогресс напарника останутся, а `install.bat` запускать второй раз не нужно.
 
-Версии 0.2.6 и 0.2.7 друг к другу не подключаются, поэтому обновиться нужно и хосту, и напарнику.
+Версии 0.3.0 и 0.3.1 друг к другу не подключаются, поэтому обновиться нужно и хосту, и напарнику.
 
 ## In English
 
@@ -46,40 +48,42 @@ A mod for GTA San Andreas 1.0 US that lets two players go through the story toge
 
 ### What's new
 
-- **Objects in hand.** A tray from a diner, a can from a vending machine, a cigarette and an open parachute are seen by the other player too. The cigarettes of smoking pedestrians are seen by both as well.
-- **Phone.** When a player talks on the phone, the other player sees the phone at their ear.
-- **Pedestrian speech.** Pedestrians chat, swear and shout the same way for both players.
-- **Police roadblocks.** The barriers and burning cars of a roadblock the police set up for a wanted player are seen by the other player too.
-- **Story characters as the player model.** If a player picks the model of a story character, for example Sweet or Ryder, the other player sees them in it too.
-- **Time after death.** While a partner is in the game, the host's death or arrest no longer moves the clock 12 hours forward. Saving still moves it 6 hours, as before.
-- **Quick reconnect.** A player whose game crashed can join again right away under the same nickname. Before, the server kept them out for another 10–20 seconds.
+- **In-game scenes.** The partner watches the missions' in-game scenes (with black bars) through the same camera as the host and hears their lines. If the mission moves the host somewhere else right before a scene, the partner ends up there too. The partner also sees the help texts during such scenes, for example the barber's tips after a haircut.
+- **Lowriders and the beach dance for two.** In the lowrider contest (Cesar Vialpando) and the beach dance (Life's a Beach) the partner plays next to the host to the same music, and their points go to the shared score. A girl sits in the partner's car too, and the contest's cameras show the partner's car.
+- **Home Invasion for two.** Either player can carry the crates of Ryder's house robbery and load them into the van. The partner wears the same balaclava and sneaks, has their own noise bar, and the van's rear doors are open for both.
+- **The partner can start a mission.** If the partner reaches a mission marker first, the host gets an invitation and presses Y to be there at once. The mission begins as soon as both stand in the marker.
+- **No black screen after a mission.** The partner now loads the host's story progress in the next mission's marker, where the screen goes dark before the mission anyway. Before, the load came at a random moment after every passed mission and looked like lag or a black screen. With no mission for 10 minutes, the world loads at a quiet moment as before.
+- **Shared skills and stats.** Car, motorbike, bicycle and flying skills are shared: both players have the better of the two. The pause menu stats are shared too. An odd job or challenge one player completes counts for both, together with its reward.
+- **A gang war of your own.** A partner more than 100 m from the host can start their own war for a district. The host sees in the chat which district it is for and how it ended.
+- **A vehicle for the partner.** If the host gets on a bicycle or a motorbike, or into a car with no free seat during a mission, the same vehicle appears next to the partner. If the mission puts the host in a plane in mid-air, as at the end of Freefall, the partner gets in as a passenger.
+- **Passenger with a gamepad.** To get in as a passenger with a gamepad, hold triangle for half a second. Holding the enter key does the same on a keyboard.
 
 ### Fixes
 
-- The host no longer crashes in Sweet's Girl when riding as the partner's passenger.
-- The partner's screen no longer stays black when the host skips a scene (for example at the station in Wrong Side of the Tracks) or leaves in the middle of a mission.
-- Missions no longer vanish for both players after loading a save with a stuck "on a mission" flag. Such a save is left by a modpack's quick save or by saving at the moment of death. The mod now lowers the flag a minute after loading.
-- After The Green Sabre the partner no longer gets 4 wanted stars that cannot be lost.
-- The partner no longer gets locked inside the crack den in Cleaning the Hood.
-- Fixed crashes: when the game has too many people, cars or objects, between players with different car, weapon or tuning mods, when a mission deletes a car with the other player in it, and the crash with high shadow quality that still happened in 0.2.6. A crash after the game has already quit (seen with MixSets and a GPS mod together) no longer counts as a crash.
-- The chat, the F9 window and the invite code show up even when another plugin takes over the game's interface drawing.
-- A passenger who shot out of the window sits back after shooting. Before, they stayed leaning out.
-- If the other player stands at the hospital or police station door, a respawning player appears a metre and a half aside instead of inside them.
-- A partner in a plane, a helicopter, a boat or on a parachute is no longer pulled out of it when a cutscene starts for the host. A partner who joins in the middle of a cutscene sees it, and the skip vote no longer waits for a partner whose cutscene never started.
-- The host's side activities (odd jobs, races, schools, the shooting range, gyms and the like) no longer count as missions for the partner. The partner no longer gets their texts and rewards and can do their own activities meanwhile.
-- Weapons given by the host's mission no longer replace the partner's own weapon of the same kind.
-- The host's story purchases (Wang Cars, Zero's shop, Verdant Meadows) show up for the partner right away.
-- A horseshoe or an oyster found by one player no longer gives the other player $100.
-- When a player leaves, their cars and the people around them stay with the other player instead of vanishing. People handed over from the other player's game react to gunfire and fights again.
-- The other player's car no longer blows up from a single heavy hit. The partner's copy no longer deletes a taxi with its driver when the partner rides in it.
-- If both players end up driving the same car, it stays with the host and the other player moves to the next seat. Before, each saw the other frozen next to them.
-- The partner no longer gets last session's world when the host loads another save. A game that stood still for a long time (loading or hung) no longer applies all the stale data at once afterwards. Copies of objects no longer end up in the host's saves.
-- The log of the previous run is kept as `coop\coop.old.log`. Send it if the game was started again after a crash.
+- No more 1-2 second freezes. They came from the voice chat, even with nobody talking, and from the other player's copy reading its clothes from disk on every change.
+- A body removed by its owner's game no longer comes back and drops money over and over. This bug came with 0.3.0.
+- After The Green Sabre the partner no longer gets 4 wanted stars that never fade in the other cities, and the roadblocks between cities go away for them once they load the host's world in the next mission's marker.
+- The partner sees the red destination markers of the host's missions. Before, the partner saw none of them.
+- Cashiers, Ammu-Nation clerks, barbers and tattoo artists no longer appear twice.
+- A passenger leaning out with a weapon not on the list (not an Uzi, Tec-9 or MP5) no longer shoots "from their fingers".
+- The T key in the middle of a cheat code no longer opens the chat.
+- The other player's cars no longer vanish when the host's mission clears the area around it.
+- The cursor in the SA:COOP window with the invite code no longer freezes in a fullscreen game.
+- With the game in Program Files, the server no longer loses the partners' profiles: its data then goes to `%LOCALAPPDATA%\SA-COOP`.
+- When the invite code cannot reach ntfy.sh (some networks block it), the game says so and suggests a VPN or an open port instead of blaming the firewall.
+- The partner gets wanted stars by the mission's rules, like the host. Before, in some missions the partner got stars where the host gets none.
+- The other player's copy flinches from hits the way they do.
+- The other player's car no longer looks like it is braking, with brake lights and smoke from the rear wheels.
+- Taking a photo with the camera no longer crashes the game in windowed mode.
+- The partner no longer finds strangers in the house of Home Invasion.
+- Tags and collected items look the same for a partner who rejoins as for the host.
+- District names in gang war messages no longer turn into gibberish.
+- When the game freezes for long, `coop.log` now shows what it was busy with.
 
-### Installing
+### Installation
 
-Unpack `SA-COOP.zip` into the game folder so that `coop.asi`, `install.bat` and the `coop` folder sit next to `gta_sa.exe`, then run `install.bat`. The mod is described in detail in `README.en.md` in the repository.
+Unpack `SA-COOP.zip` into the game folder so that `coop.asi`, `install.bat` and the `coop` folder sit next to `gta_sa.exe`, and run `install.bat`. The archive has detailed instructions in `Инструкция.txt` (Russian), and the repository's README describes the mod.
 
-To update from an earlier version, unpack the archive over the old files. Your settings and the partner's progress stay, and there is no need to run `install.bat` again.
+To update from the previous version, unpack the archive over the old files. The settings and the partner's progress stay, and `install.bat` does not need to run again.
 
-Versions 0.2.6 and 0.2.7 cannot connect to each other, so both the host and the partner need to update.
+Versions 0.3.0 and 0.3.1 cannot connect to each other, so both the host and the partner need to update.
